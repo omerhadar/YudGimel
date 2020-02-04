@@ -17,7 +17,7 @@ class DQNAgent(object):
         self.short_memory = np.array([])
         self.agent_target = 1
         self.agent_predict = 0
-        self.learning_rate = 0.01
+        self.learning_rate = 0.1
         self.model = self.network()
         #self.model = self.network("weights.hdf5")
         self.epsilon = 0
@@ -26,26 +26,21 @@ class DQNAgent(object):
 
     def get_state(self, player, board):
 
-        def thread_func(p, mod, b):
-            if mod == 1:
-                while b.get_at((p.x + int(5 * cos(radians(p.angle))),
-                                p.y + int(5 * sin(radians(p.angle))))) != (255, 0, 0):
-                    lst[mod] += 1
-                    p.move()
-            else:
-                while not p.is_dead() and lst[mod] < 70:
-                    lst[mod] += 1
-                    if mod == 0:
-                        p.angle -= 5
-                    elif mod == 2:
-                        p.angle += 5
-                    p.move()
+        def thread_func(p, mod):
+            while not p.is_dead() and lst[mod] < 45:
+                lst[mod] += 1
+                if mod == 0:
+                    p.angle -= 5
+                elif mod == 2:
+                    p.angle += 5
+                p.move()
+            lst[mod] = 1 - (lst[mod] / 45)
 
         lst = [0, 0, 0]
 
         ths = []
         for i in range(3):
-            t = threading.Thread(target=thread_func, args=(player.copy(), i, board))
+            t = threading.Thread(target=thread_func, args=(player.copy(), i))
             ths.append(t)
             t.start()
 
@@ -60,8 +55,10 @@ class DQNAgent(object):
 
     def network(self, weights=None):
         model = Sequential()
-        model.add(Dense(units=10, activation='relu', input_dim=3))
-        model.add(Dropout(0.15))
+        model.add(Dense(units=50, activation='relu', input_dim=3))
+        #model.add(Dropout(0.15))
+        #model.add(Dense(units=50, activation='softmax'))
+        #model.add(Dropout(0.15))
         model.add(Dense(units=3, activation='softmax'))
         opt = Adam(self.learning_rate)
         model.compile(loss='mse', optimizer=opt)
@@ -84,7 +81,7 @@ class DQNAgent(object):
                 target = reward + self.gamma * np.amax(self.model.predict(np.array([next_state]))[0])
             target_f = self.model.predict(np.array([state]))
             target_f[0][np.argmax(action)] = target
-            self.model.fit(np.array([state]), target_f, epochs=1, verbose=0)
+            self.model.fit(np.array([state]), target_f, epochs=5, verbose=0)
 
     def train_short_memory(self, state, action, reward, next_state, done):
         target = reward
@@ -92,4 +89,4 @@ class DQNAgent(object):
             target = reward + self.gamma * np.amax(self.model.predict(next_state.reshape((1, 3)))[0])
         target_f = self.model.predict(state.reshape((1, 3)))
         target_f[0][np.argmax(action)] = target
-        self.model.fit(state.reshape((1, 3)), target_f, epochs=1, verbose=0)
+        self.model.fit(state.reshape((1, 3)), target_f, epochs=10, verbose=0)

@@ -68,9 +68,12 @@ class Player(object):
 
     def gen(self):
         # generates random position and direction
-        self.x = random.randrange(50, WINWIDTH - 165)
-        self.y = random.randrange(50, WINHEIGHT - 50)
-        self.angle = random.randrange(0, 360)
+        #self.x = random.randrange(50, WINWIDTH - 165)
+        #self.y = random.randrange(50, WINHEIGHT - 50)
+        #self.angle = random.randrange(0, 360)
+        self.x = 500
+        self.y = 500
+        self.angle = 0
 
     def copy(self):
         return Player(player=self)
@@ -103,7 +106,7 @@ class Player(object):
 def rungame(count):
     global WINNER
 
-    epsilon = 40 - count
+    epsilon = 150 - count
 
     DISPLAYSURF.fill(BLACK)
 
@@ -112,7 +115,7 @@ def rungame(count):
     pygame.draw.line(DISPLAYSURF, RED, (WINWIDTH - 2, 2), (2, 2), 10)
     pygame.draw.line(DISPLAYSURF, RED, (WINWIDTH - 2, WINHEIGHT - 2), (2, WINHEIGHT - 2), 10)
 
-    flag = 0
+    moves = 0
     run = True
     reward = 0
 
@@ -120,6 +123,7 @@ def rungame(count):
     player1 = Player()
     player1.gen()
     while run:
+        moves += 1
         """
         # generating random holes
         hole = random.randrange(1, 50)
@@ -149,7 +153,7 @@ def rungame(count):
             if keys[pygame.K_RIGHT]:
                 player1.angle += TURN_RATE
         else:
-            if random.randint(0, 10) < epsilon:
+            if random.randint(0, 70) < epsilon:
                 final_move = [0, 0, 0]
                 final_move[random.randint(0, 2)] = 1
             else:
@@ -158,13 +162,13 @@ def rungame(count):
 
             if final_move[0] == 1:
                 player1.angle -= TURN_RATE
-            elif final_move[2] == 1:
+            elif final_move[1] == 1:
                 player1.angle += TURN_RATE
 
         player1.move()
 
         if player1.is_dead():
-            reward -= 250
+            reward -= 200
             print("game", count, "ended with rewards", reward)
             run = False
 
@@ -172,6 +176,8 @@ def rungame(count):
             state_new = agent.get_state(player1, DISPLAYSURF)
 
             reward += 1
+            # if moves > 100 and moves % 70 == 0:
+            #    reward += 10
 
             agent.train_short_memory(state_old, final_move, reward, state_new, player1.is_dead())
 
@@ -191,8 +197,8 @@ def rungame(count):
         # drawing all on the screen
         SCREEN.blit(DISPLAYSURF, (0, 0))
         pygame.display.update()
-
-        #FPS_CLOCK.tick(SPEED)
+        # FPS_CLOCK.tick(SPEED)
+    agent.replay_new(agent.memory)
 
 
 if __name__ == '__main__':
