@@ -2,11 +2,12 @@ import random
 import os
 import pygame
 import pygame.gfxdraw
-from DQA import DQNAgent
+from DQA import *
 import numpy as np
 from keras.utils import to_categorical
 from math import *
 from pygame.locals import *
+import time
 
 SPEED = 60      # frames per second setting
 WINWIDTH = 1280  # width of the program's window, in pixels
@@ -25,11 +26,21 @@ P2COLOUR = GREEN
 P3COLOUR = BLUE
 YELLOW = (255, 255, 0)
 
+# Exploration settings
+epsilon = 1  # not a constant, going to be decayed
+EPSILON_DECAY = 0.99975
+MIN_EPSILON = 0.001
+
+#  Stats settings
+AGGREGATE_STATS_EVERY = 50  # episodes
+SHOW_PREVIEW = False
+
 AI = True
 agent = DQNAgent()
 
 
 def main():
+    global epsilon
     os.environ['SDL_VIDEO_CENTERED'] = '0'
     os.environ['SDL_VIDEO_WINDOW_POS'] = "%d,%d" % (0, 0)
     # main loop
@@ -40,10 +51,27 @@ def main():
     DISPLAYSURF = pygame.Surface(SCREEN.get_size())
     pygame.display.set_caption('Nope!')
 
+    ep_rewards = []
     games_counter = 0
     while True:
-        rungame(games_counter)
+        ep_rewards.append(run_game(games_counter))
         games_counter += 1
+        if not games_counter % AGGREGATE_STATS_EVERY or games_counter == 0:
+            average_reward = sum(ep_rewards[-AGGREGATE_STATS_EVERY:]) / len(ep_rewards[-AGGREGATE_STATS_EVERY:])
+            min_reward = min(ep_rewards[-AGGREGATE_STATS_EVERY:])
+            max_reward = max(ep_rewards[-AGGREGATE_STATS_EVERY:])
+            agent.tensorboard.update_stats(reward_avg=average_reward, reward_min=min_reward, reward_max=max_reward,
+                                           epsilon=epsilon)
+
+            # Save model, but only when min reward is greater or equal a set value
+            if min_reward >= MIN_REWARD:
+                agent.model.save(
+                    f'C:/Users/omerh/Documents/GitHub/YudGimel/models/{MODEL_NAME}__{max_reward:_>7.2f}max_{average_reward:_>7.2f}avg_{min_reward:_>7.2f}min__{int(time.time())}.model')
+
+            # Decay epsilon
+        if epsilon > MIN_EPSILON:
+            epsilon *= EPSILON_DECAY
+            epsilon = max(MIN_EPSILON, epsilon)
         SCREEN = pygame.display.set_mode((WINWIDTH, WINHEIGHT))
         DISPLAYSURF = pygame.Surface(SCREEN.get_size())
 
@@ -103,10 +131,10 @@ class Player(object):
         pygame.gfxdraw.filled_circle(DISPLAYSURF, self.x, self.y, RADIUS, self.colour)
 
 
-def rungame(count):
-    global WINNER
-
-    epsilon = 150 - count
+def run_game(count):
+    # Restarting episode - reset episode reward and step number
+    episode_reward = 0
+    step = 1
 
     DISPLAYSURF.fill(BLACK)
 
@@ -122,6 +150,8 @@ def rungame(count):
     # generating players
     player1 = Player()
     player1.gen()
+    state_old = agent.get_state(player1, DISPLAYSURF)
+
     while run:
         moves += 1
         """
@@ -140,7 +170,6 @@ def rungame(count):
         else:
             player1.colour = RED
         """
-        state_old = agent.get_state(player1, DISPLAYSURF)
 
         player1.colour = RED
         player1.draw(False)
@@ -153,7 +182,7 @@ def rungame(count):
             if keys[pygame.K_RIGHT]:
                 player1.angle += TURN_RATE
         else:
-            if random.randint(0, 70) < epsilon:
+            if np.random.random() < epsilon:
                 final_move = [0, 0, 0]
                 final_move[random.randint(0, 2)] = 1
             else:
@@ -168,7 +197,7 @@ def rungame(count):
         player1.move()
 
         if player1.is_dead():
-            reward -= 200
+            reward -= 100
             print("game", count, "ended with rewards", reward)
             run = False
 
@@ -176,12 +205,14 @@ def rungame(count):
             state_new = agent.get_state(player1, DISPLAYSURF)
 
             reward += 1
+
             # if moves > 100 and moves % 70 == 0:
             #    reward += 10
 
-            agent.train_short_memory(state_old, final_move, reward, state_new, player1.is_dead())
+            agent.update_replay_memory((state_old, final_move, reward, state_new, not run))
 
-            agent.remember(state_old, final_move, reward, state_new, player1.is_dead())
+            agent.train(not run, step)
+            state_old = state_new
 
         player1.colour = YELLOW
         player1.draw()
@@ -198,7 +229,7 @@ def rungame(count):
         SCREEN.blit(DISPLAYSURF, (0, 0))
         pygame.display.update()
         # FPS_CLOCK.tick(SPEED)
-    agent.replay_new(agent.memory)
+    return reward
 
 
 if __name__ == '__main__':
