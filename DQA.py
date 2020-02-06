@@ -91,12 +91,12 @@ class DQNAgent(object):
         minibatch = random.sample(self.replay_memory, MINIBATCH_SIZE)
 
         # Get current states from minibatch, then query NN model for Q values
-        current_states = np.array([transition[0] for transition in minibatch]) / 255
+        current_states = np.array([transition[0] for transition in minibatch])
         current_qs_list = self.model.predict(current_states)
 
         # Get future states from minibatch, then query NN model for Q values
         # When using target network, query it, otherwise main network should be queried
-        new_current_states = np.array([transition[3] for transition in minibatch]) / 255
+        new_current_states = np.array([transition[3] for transition in minibatch])
         future_qs_list = self.target_model.predict(new_current_states)
 
         X = []
@@ -112,7 +112,6 @@ class DQNAgent(object):
                 new_q = reward + DISCOUNT * max_future_q
             else:
                 new_q = reward
-
             # Update Q value for given state
             current_qs = current_qs_list[index]
             current_qs[np.array(action).argmax()] = new_q
@@ -122,7 +121,7 @@ class DQNAgent(object):
             y.append(current_qs)
 
         # Fit on all samples as one batch, log only on terminal state
-        self.model.fit(np.array(X) / 255, np.array(y), batch_size=MINIBATCH_SIZE, verbose=0, shuffle=False,
+        self.model.fit(np.array(X), np.array(y), batch_size=MINIBATCH_SIZE, verbose=0, shuffle=False,
                        callbacks=[self.tensorboard] if terminal_state else None)
 
         # Update target network counter every episode
@@ -133,6 +132,10 @@ class DQNAgent(object):
         if self.target_update_counter > UPDATE_TARGET_EVERY:
             self.target_model.set_weights(self.model.get_weights())
             self.target_update_counter = 0
+
+    def load_model(self, file_name):
+        self.model.load_weights(file_name)
+        self.target_model.load_weights(file_name)
 
 
 class ModifiedTensorBoard(TensorBoard):
