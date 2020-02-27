@@ -125,8 +125,8 @@ class Player(object):
     def is_dead(self):
         if self.x < 5 or self.x > WINWIDTH - 5 or self.y < 5 or self.y > WINHEIGHT - 5:
             return True
-        if self.colour == BLACK:
-            return False
+        #if self.colour == BLACK:
+        #    return False
         for i in range(self.angle - 90, self.angle + 90, 10):
             if DISPLAYSURF.get_at((self.x + int(RADIUS * cos(radians(i))),
                                    self.y + int(RADIUS * sin(radians(i))))) == RED:
@@ -159,6 +159,7 @@ def run_game(count):
     moves = 0
     run = True
     reward = 0
+    flag = -68
 
     # generating players
     player1 = Player()
@@ -169,12 +170,11 @@ def run_game(count):
 
     while run:
         moves += 1
-        """
         # generating random holes
         hole = random.randrange(1, 50)
         if hole == 1 or flag:
             flag += 1
-            if flag > 8:
+            if flag > 12:
                 flag = -68
                 player1.colour = RED
             elif flag < 0:
@@ -184,9 +184,8 @@ def run_game(count):
                 player1.colour = BLACK
         else:
             player1.colour = RED
-        """
 
-        player1.colour = RED
+        #player1.colour = RED
         player1.draw(False)
 
         # steering
